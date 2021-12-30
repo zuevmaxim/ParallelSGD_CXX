@@ -69,8 +69,9 @@ public:
                              iterations(iterations) {
     }
 
-    void solve(const DataSet& train) {
-        int features = train.features + 1;
+    std::vector<fp_type> solve(const DataSet& train, const int* degrees) {
+        this->degrees = degrees;
+        int features = train.features;
         std::vector<fp_type> w(features, 0);
 
         std::vector<std::thread> tasks;
@@ -82,6 +83,16 @@ public:
         for (auto& task : tasks) {
             task.join();
         }
+        return w;
+    }
+
+    fp_type accuracy(const std::vector<fp_type>& w, const DataSet& test) {
+        fp_type s = 0.0;
+        for (const auto& point : test.points) {
+            const fp_type x = dot(&w[0], point.indices.size(), &point.indices[0], &point.xs[0]);
+            s += std::max(1 - x * point.y, static_cast<fp_type>(0.0));
+        }
+        return s / test.points.size();
     }
 
 private:
@@ -101,26 +112,38 @@ private:
     }
 
     inline static fp_type
-    dot(const fp_type* w, int wSize, const std::vector<int>& indices, const std::vector<fp_type>& xs) {
+    dot(const fp_type* __restrict__ w, const int size,  const int*  __restrict__ indices, const fp_type* __restrict__  xs) {
         fp_type s = 0;
-        const int size = indices.size();
         for (int i = 0; i < size; ++i) {
             s += xs[i] * w[indices[i]];
         }
-//        s += w[wSize];
         return s;
     }
 
-    inline static void gradientStep(const Point& p, fp_type* w, const int wSize, const fp_type learningRate) {
-        const auto& indices = p.indices;
-        const auto& xs = p.xs;
-        const fp_type e = exp(-dot(w, wSize, indices, xs));
-        const fp_type grad = learningRate * (1 / (1 + e) - p.y);
-        const int size = indices.size();
-        for (int i = 0; i < size; ++i) {
-            w[indices[i]] -= xs[i] * grad;
+    inline void gradientStep(const Point& p, fp_type* __restrict__ w, const int wSize, const fp_type learningRate) const {
+        const int size = p.indices.size();
+        const int* __restrict__ indices = &p.indices[0];
+        const fp_type* __restrict__ xs = &p.xs[0];
+
+        const fp_type wxy = dot(w, size, indices, xs) * p.y;
+
+        if (wxy < 1) { // hinge is active.
+            const fp_type e = p.y * learningRate;
+            for (int i = 0; i < size; ++i) {
+                w[indices[i]] += xs[i] * e;
+            }
         }
-//        w[wSize] -= grad;
+
+        int const* __restrict__ const degs = degrees;
+
+        // update based on the evaluation
+        const fp_type scalar = learningRate * 1.0;
+        for (int i = size; i-- > 0;) {
+            int const j = indices[i];
+            unsigned const deg = degs[j];
+            w[j] *= 1 - scalar / deg;
+        }
+
     }
 
 
@@ -128,21 +151,32 @@ private:
     const fp_type stepDecay;
     const int threads;
     const int iterations;
+    const int* degrees;
 };
 
 
 int main() {
     auto p = loadBinaryDataSet("/Users/Maksim.Zuev/Documents/datasets/rcv1");
-    std::vector<int> time;
-    for (int threads = 1; threads <= 16; threads *= 2) {
-        for (int i = 0; i < 5; ++i) {
-            Solver solver(0.5, 0.8, threads, 10);
-            solver.solve(p.first);
+
+    std::vector<int> degrees(p.first.features, 0);
+    for (const auto& point : p.first.points) {
+        for (int i : point.indices) {
+            degrees[i]++;
         }
+    }
+
+    std::vector<int> time;
+    for (int threads = 1; threads <= 16; threads++) {
+        {
+            Solver solver(0.5, 0.8, threads, 10);
+            solver.solve(p.first, &degrees[0]);
+        }
+
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
         for (int i = 0; i < 10; ++i) {
             Solver solver(0.5, 0.8, threads, 10);
-            solver.solve(p.first);
+            auto w = solver.solve(p.first, &degrees[0]);
+            std::cout << threads << ' ' << solver.accuracy(w, p.second) << '\n';
         }
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
         int time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() / 10.0;
