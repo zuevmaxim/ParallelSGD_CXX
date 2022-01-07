@@ -160,7 +160,7 @@ private:
 
 
 int main() {
-    auto p = loadBinaryDataSet("/Users/Maksim.Zuev/Documents/datasets/rcv1");
+    auto p = loadBinaryDataSet("../datasets/rcv1");
     std::vector<int> degrees(p.first.features, 0);
     for (const auto& point : p.first.points) {
         for (int i : point.indices) {
