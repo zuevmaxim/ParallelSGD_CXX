@@ -5,6 +5,8 @@
 #include <thread>
 #include <utility>
 #include <chrono>
+#include <algorithm>
+#include <random>
 
 typedef double fp_type;
 
@@ -48,6 +50,8 @@ DataSet loadDataSet(const std::string& name) {
 
     in.close();
     dataSet.features = features;
+    auto rng = std::default_random_engine {};
+    std::shuffle(std::begin(dataSet.points), std::end(dataSet.points), rng);
 
     std::cout << "Dataset " << name << " loaded" << std::endl;
     return dataSet;
@@ -157,7 +161,6 @@ private:
 
 int main() {
     auto p = loadBinaryDataSet("/Users/Maksim.Zuev/Documents/datasets/rcv1");
-
     std::vector<int> degrees(p.first.features, 0);
     for (const auto& point : p.first.points) {
         for (int i : point.indices) {
@@ -166,22 +169,15 @@ int main() {
     }
 
     std::vector<int> time;
-    for (int threads = 1; threads <= 16; threads++) {
-        {
-            Solver solver(0.5, 0.8, threads, 10);
-            solver.solve(p.first, &degrees[0]);
-        }
-
+    const int iterations = 100;
+    for (int threads = 1; threads <= 16; threads *= 2) {
+        Solver solver(0.5, 0.8, threads, iterations);
         std::chrono::steady_clock::time_point begin = std::chrono::steady_clock::now();
-        for (int i = 0; i < 10; ++i) {
-            Solver solver(0.5, 0.8, threads, 10);
-            auto w = solver.solve(p.first, &degrees[0]);
-            std::cout << threads << ' ' << solver.accuracy(w, p.second) << '\n';
-        }
+        auto w = solver.solve(p.first, &degrees[0]);
         std::chrono::steady_clock::time_point end = std::chrono::steady_clock::now();
-        int time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() / 10.0;
+        int time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - begin).count() / double(iterations);
         time.push_back(time_ms);
-        std::cout << threads << ' ' << time_ms << ' ' << (double) time[0] / time_ms << std::endl;
+        std::cout << threads << ' ' << time_ms << ' ' << (double) time[0] / time_ms << ' ' << solver.accuracy(w, p.second) << std::endl;
     }
 
     return 0;
