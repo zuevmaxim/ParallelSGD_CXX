@@ -9,6 +9,7 @@
 #include <random>
 #include <sys/time.h>
 #include <memory>
+#include <atomic>
 
 typedef double fp_type;
 
