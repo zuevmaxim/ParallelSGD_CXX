@@ -169,7 +169,9 @@ public:
             std::vector<std::atomic<int>> local_status(threads);
             status.swap(local_status);
         }
-        std::fill(status.begin(), status.end(), 2);
+        for (int i = 0; i < threads; ++i) {
+            status[i].store(2);
+        }
         std::vector<std::thread> tasks;
         tasks.reserve(threads);
         for (int i = 0; i < threads; ++i) {
@@ -180,16 +182,20 @@ public:
         for (int iteration = 0; iteration < iterations; ++iteration) {
             std::shuffle(std::begin(train.points), std::end(train.points), rng);
             clock.Start();
-            std::fill(status.begin(), status.end(), 1);
+            for (int i = 0; i < threads; ++i) {
+                status[i].store(1);
+            }
 
             for (int i = 0; i < threads; ++i) {
-                while (status[i] != 2);
+                while (status[i].load() != 2);
             }
             clock.Pause();
             learningRate *= stepDecay;
         }
 
-        std::fill(status.begin(), status.end(), 0);
+        for (int i = 0; i < threads; ++i) {
+            status[i].store(0);
+        }
 
         for (auto& task : tasks) {
             task.join();
@@ -213,10 +219,10 @@ private:
 
     void threadRoutine(int threadId, fp_type* w, const DataSet* train) {
         while (true) {
-            if (status[threadId] == 0) return;
-            if (status[threadId] == 1) {
+            if (status[threadId].load() == 0) return;
+            if (status[threadId].load() == 1) {
                 threadSolve(threadId, w, train);
-                status[threadId] = 2;
+                status[threadId].store(2);
             }
         }
     }
