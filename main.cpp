@@ -7,7 +7,7 @@
 #include <chrono>
 #include <algorithm>
 #include <random>
-#include <libc.h>
+#include <sys/time.h>
 #include <memory>
 
 typedef double fp_type;
