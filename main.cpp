@@ -329,8 +329,12 @@ private:
 };
 
 
-int main() {
+int main(int argc, char** argv) {
+    char* threads_num = argv[1];
+    int threads = std::atoi(threads_num);
+    std::cout << "Threads number " << threads << std::endl;
     auto p = loadBinaryDataSet("../datasets/rcv1");
+    std::cout << "Features " << p.first.features << std::endl;
     std::vector<int> degrees(p.first.features, 0);
     SeedByTime();
     for (const auto& point : p.first.points) {
@@ -341,7 +345,6 @@ int main() {
 
     int base_ms = 0;
     const int iterations = 100;
-    int threads = 1;
 //    for (int threads = 1; threads <= 16; threads *= 2) {
         Solver solver(0.5, 0.8, threads, iterations);
         Clock clock;
