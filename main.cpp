@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <memory>
 #include <atomic>
+#include <cstdlib>
 
 typedef double fp_type;
 
