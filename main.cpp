@@ -10,6 +10,7 @@
 #include <memory>
 #include <atomic>
 #include <cstdlib>
+#include <string.h>
 
 typedef double fp_type;
 
