@@ -341,7 +341,8 @@ int main() {
 
     int base_ms = 0;
     const int iterations = 100;
-    for (int threads = 1; threads <= 16; threads *= 2) {
+    int threads = 1;
+//    for (int threads = 1; threads <= 16; threads *= 2) {
         Solver solver(0.5, 0.8, threads, iterations);
         Clock clock;
         auto w = solver.solve(p.first, &degrees[0], clock);
@@ -351,7 +352,7 @@ int main() {
         }
         std::cout << threads << ' ' << time_ms << ' ' << (double) base_ms / time_ms << ' '
                   << Solver::accuracy(w, p.second) << std::endl;
-    }
+//    }
 
     return 0;
 }
