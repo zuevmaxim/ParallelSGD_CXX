@@ -4,7 +4,6 @@
 #include <sstream>
 #include <thread>
 #include <utility>
-#include <chrono>
 #include <algorithm>
 #include <random>
 #include <sys/time.h>
@@ -95,6 +94,7 @@ struct Point {
 struct DataSet {
     int features{};
     std::vector<Point> points;
+    std::vector<int> indices;
 };
 
 DataSet loadDataSet(const std::string& name) {
@@ -139,6 +139,10 @@ DataSet loadDataSet(const std::string& name) {
     DataSet dataSet;
     dataSet.features = features;
     dataSet.points.reserve(points.size());
+    dataSet.indices.resize(points.size());
+    for (int i = 0; i < points.size(); ++i) {
+        dataSet.indices[i] = i;
+    }
     for (const auto& point : points) {
         dataSet.points.push_back(point);
     }
@@ -181,7 +185,7 @@ public:
 
         auto rng = std::default_random_engine{};
         for (int iteration = 0; iteration < iterations; ++iteration) {
-            std::shuffle(std::begin(train.points), std::end(train.points), rng);
+            std::shuffle(std::begin(train.indices), std::end(train.indices), rng);
             clock.Start();
             for (int i = 0; i < threads; ++i) {
                 status[i].store(1);
@@ -230,13 +234,14 @@ private:
 
     void threadSolve(int threadId, fp_type* w, const DataSet* train) const {
         const Point* points = &train->points[0];
+        const int* indices = &train->indices[0];
         const int n = train->points.size();
         const int block = n / threads;
         const int start = threadId * block;
         const int end = threadId == threads - 1 ? n : std::min(n, start + block);
         const fp_type alpha = learningRate;
         for (int i = start; i < end; ++i) {
-            gradientStep(points[i], w, alpha);
+            gradientStep(points[indices[i]], w, alpha);
         }
     }
 
