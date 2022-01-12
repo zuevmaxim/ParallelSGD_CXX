@@ -28,6 +28,40 @@ inline unsigned long long CurrentNSec() {
       (unsigned long long) ts.tv_sec * 1000 * 1000 * 1000;
 #endif
 }
+unsigned int seed_ = 0;
+
+
+void SetSeed(unsigned int seed) {
+    seed_ = seed;
+    srand(seed_);
+    srand48(seed_);
+}
+
+void SeedByTime() {
+    unsigned int seed = (unsigned int) CurrentNSec();
+    SetSeed(seed);
+}
+
+unsigned int RandInt(unsigned int nMax) {
+    return (unsigned int) (((double) nMax) * (rand_r(&seed_) / (RAND_MAX + 1.0)));
+}
+
+template <class T>
+void LazyPODShuffle(T* arr, unsigned int len) {
+    char swap[sizeof(T)];
+    T *temp = reinterpret_cast<T*>(swap);
+    for (unsigned int i = 0; i < len; i++) {
+        unsigned int swapi = RandInt(len);
+        if (swapi == i) {
+            continue;
+        }
+        memcpy(temp, &arr[i], sizeof(T));
+        memcpy(&arr[i], &arr[swapi], sizeof(T));
+        memcpy(&arr[swapi], temp, sizeof(T));
+    }
+}
+
+
 
 /*! \brief A simple timer which can be started and stopped
  * Only read Clock.value after a stop or pause, otherwise use Read()
@@ -134,8 +168,8 @@ DataSet loadDataSet(const std::string& name) {
     }
 
     in.close();
-    auto rng = std::default_random_engine{};
-    std::shuffle(std::begin(points), std::end(points), rng);
+//    auto rng = std::default_random_engine{};
+//    std::shuffle(std::begin(points), std::end(points), rng);
     DataSet dataSet;
     dataSet.features = features;
     dataSet.points.reserve(points.size());
@@ -183,9 +217,10 @@ public:
             tasks.emplace_back(&Solver::threadRoutine, this, i, &w[0], &train);
         }
 
-        auto rng = std::default_random_engine{};
+//        auto rng = std::default_random_engine{};
         for (int iteration = 0; iteration < iterations; ++iteration) {
-            std::shuffle(std::begin(train.indices), std::end(train.indices), rng);
+            LazyPODShuffle(train.indices.data(), train.indices.size());
+//            std::shuffle(std::begin(train.indices), std::end(train.indices), rng);
             clock.Start();
             for (int i = 0; i < threads; ++i) {
                 status[i].store(1);
@@ -295,6 +330,7 @@ private:
 int main() {
     auto p = loadBinaryDataSet("../datasets/rcv1");
     std::vector<int> degrees(p.first.features, 0);
+    SeedByTime();
     for (const auto& point : p.first.points) {
         for (int i : point.indices) {
             degrees[i]++;
